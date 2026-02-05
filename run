@@ -13,5 +13,26 @@ function test {
     docker run --rm -it -v "$(pwd):/app" box-mock-test
 }
 
+function run-tests {
+    docker build -f Dockerfile.test -t box-mock-test .
+    if [ -t 1 ]; then
+        docker run --rm -it -v "$(pwd):/app" box-mock-test pytest tests/ -v
+    else
+        docker run --rm -v "$(pwd):/app" box-mock-test pytest tests/ -v
+    fi
+}
+
+function coverage-above-90 {
+    docker build -f Dockerfile.test -t box-mock-test .
+    output=$(docker run --rm box-mock-test pytest tests/ --cov=box_mock --cov-report=term 2>&1)
+    echo "$output"
+    coverage=$(echo "$output" | awk '/TOTAL/ {gsub(/%/, "", $4); print $4}')
+    if [ -z "$coverage" ] || [ "$(echo "$coverage < 90" | bc)" -eq 1 ]; then
+        echo "Coverage is below 90% (got ${coverage:-0}%)"
+        return 1
+    fi
+    echo "Coverage is above 90% (${coverage}%)"
+}
+
 TIMEFORMAT=$'\nTask completed in %3lR'
 time "${@:-help}"
