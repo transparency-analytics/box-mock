@@ -30,7 +30,7 @@ def setup_db_session() -> None:
     g.db_session = session_class()
 
 
-def teardown_db_session(exception: BaseException | None = None) -> None: # noqa: ARG001
+def teardown_db_session(exception: BaseException | None = None) -> None:  # noqa: ARG001
     """Teardown hook to cleanup session."""
     session = g.pop("db_session", None)
     if session:

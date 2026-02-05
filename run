@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+function quality {
+    ruff check --fix && ruff format
+}
+
+function check-quality {
+    ruff check && ruff format --check
+}
+
+TIMEFORMAT=$'\nTask completed in %3lR'
+time "${@:-help}"
