@@ -73,8 +73,15 @@ client = get_mock_box_client("http://localhost:8888", identity="test-worker-1")
 folders = client.folders.get_folder_items("0")
 ```
 
+## Testing
+
+```bash
+./run test  # Build test container and run pytest
+```
+
 ## Development
 
 ```bash
 ./run quality        # Lint and format
+./run check-quality  # Check only (CI)
 ```

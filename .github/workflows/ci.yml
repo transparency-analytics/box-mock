@@ -24,3 +24,16 @@ jobs:
 
       - name: Run quality check
         run: ./run check-quality
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build test container
+        run: docker build -f Dockerfile.test -t box-mock-test .
+
+      - name: Run tests
+        run: docker run --rm box-mock-test pytest tests/ -v
