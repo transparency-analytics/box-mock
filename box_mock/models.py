@@ -104,10 +104,35 @@ class File(Base):
             "id": self.id,
             "name": self.name,
             "size": self.size,
+            "extension": self.name.rsplit(".", 1)[-1] if "." in self.name else "",
+            "sha1": "",
+            "is_download_available": True,
+            "authenticated_download_url": f"/2.0/files/{self.id}/content",
+            "watermark_info": {"is_watermarked": False},
+            "permissions": {
+                "can_preview": True,
+                "can_download": True,
+                "can_upload": False,
+            },
+            "shared_link": None,
             "parent": {"type": "folder", "id": self.folder_id},
             "file_version": {
                 "id": f"{self.id}_v{self.version}",
                 "version_number": self.version,
+            },
+            "representations": {
+                "entries": [
+                    {
+                        "representation": "pdf",
+                        "status": {"state": "success"},
+                        "content": {
+                            "url_template": (
+                                f"/2.0/files/{self.id}/content{{+asset_path}}"
+                            )
+                        },
+                        "properties": {},
+                    }
+                ]
             },
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
