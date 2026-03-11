@@ -70,6 +70,16 @@ class Folder(Base):
         cascade="all, delete-orphan",
     )
 
+    def get_path_collection(self) -> list[dict[str, Any]]:
+        """Return the ancestor chain from root down to (but not including) this folder."""
+        ancestors: list[dict[str, Any]] = []
+        node = self.parent
+        while node is not None:
+            ancestors.append({"type": "folder", "id": node.id, "name": node.name})
+            node = node.parent
+        ancestors.reverse()
+        return ancestors
+
     def to_dict(self) -> dict[str, Any]:
         """Convert folder to dictionary representation."""
         return {
@@ -80,6 +90,67 @@ class Folder(Base):
             if self.parent_id
             else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+        }
+
+    def to_full_dict(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        sort: str = "name",
+        direction: str = "asc",
+    ) -> dict[str, Any]:
+        """Return a full folder representation including item_collection and path_collection.
+
+        This is the shape expected by the Box UI Elements picker.
+        """
+        children: list[dict[str, Any]] = [c.to_dict() for c in self.children]
+        children.extend(f.to_dict() for f in self.files)
+
+        reverse = direction.lower() == "desc"
+        if sort == "name":
+            children.sort(key=lambda x: (x.get("name") or "").lower(), reverse=reverse)
+        elif sort == "date":
+            children.sort(key=lambda x: x.get("created_at") or "", reverse=reverse)
+        elif sort == "size":
+            children.sort(key=lambda x: x.get("size") or 0, reverse=reverse)
+
+        total = len(children)
+        page = children[offset : offset + limit]
+
+        path_entries = self.get_path_collection()
+
+        return {
+            "type": "folder",
+            "id": self.id,
+            "name": self.name,
+            "parent": {"type": "folder", "id": self.parent_id}
+            if self.parent_id
+            else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "modified_at": self.created_at.isoformat() if self.created_at else None,
+            "permissions": {
+                "can_download": True,
+                "can_upload": True,
+                "can_rename": True,
+                "can_delete": True,
+                "can_share": True,
+                "can_set_share_access": False,
+                "can_invite_collaborator": False,
+            },
+            "path_collection": {
+                "total_count": len(path_entries),
+                "entries": path_entries,
+            },
+            "item_collection": {
+                "total_count": total,
+                "limit": limit,
+                "offset": offset,
+                "entries": page,
+            },
+            "has_collaborations": False,
+            "is_externally_owned": False,
+            "is_download_available": True,
+            "size": 0,
         }
 
 
