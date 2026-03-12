@@ -20,11 +20,23 @@ if TYPE_CHECKING:
 
 
 def get_files_dir() -> Path:
-    """Get the files directory for the current identity."""
-    from box_mock.db import DATA_DIR  # noqa: PLC0415
+    """Get the files directory for the current identity.
+
+    When ``app.config["FILES_DIR"]`` is set (e.g. in tests) it is used as the
+    root instead of the default ``DATA_DIR / identity / files`` path.
+    """
+    from pathlib import Path  # noqa: PLC0415
+
+    from flask import current_app  # noqa: PLC0415
 
     identity = g.get("identity", "default")
-    files_dir = DATA_DIR / identity / "files"
+    files_root: Path | None = current_app.config.get("FILES_DIR")
+    if files_root is not None:
+        files_dir = files_root / identity
+    else:
+        from box_mock.db import DATA_DIR  # noqa: PLC0415
+
+        files_dir = DATA_DIR / identity / "files"
     files_dir.mkdir(parents=True, exist_ok=True)
     return files_dir
 

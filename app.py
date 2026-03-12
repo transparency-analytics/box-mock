@@ -1,6 +1,7 @@
 """Box Mock API Server - Entry point for running the Flask application."""
 
 import argparse
+import uuid
 from pathlib import Path
 
 from flask import Flask, request
@@ -15,13 +16,30 @@ from box_mock.routes.sign_requests import sign_requests_bp
 from box_mock.routes.users import users_bp
 
 
-def create_app() -> Flask:
-    """Create Flask app with identity-based database isolation."""
+def create_app(testing: bool = False) -> Flask:
+    """Create Flask app with identity-based database isolation.
+
+    Pass ``testing=True`` to use a fresh in-memory SQLite database instead of
+    the on-disk store under ``/data``.  Each call with ``testing=True`` gets its
+    own unique database so tests are automatically isolated without any
+    monkeypatching.
+    """
     app = Flask(__name__)
 
-    data_dir = Path("/data")
-    data_dir.mkdir(parents=True, exist_ok=True)
-    app.config["DATA_DIR"] = data_dir
+    if testing:
+        import tempfile  # noqa: PLC0415
+
+        # Unique URI so every create_app(testing=True) call gets its own DB.
+        unique_id = uuid.uuid4().hex
+        app.config["DB_URL"] = (
+            f"sqlite:///file:testdb_{unique_id}?mode=memory&cache=shared&uri=true"
+        )
+        # File uploads go to a per-test temp directory.
+        app.config["FILES_DIR"] = Path(tempfile.mkdtemp(prefix="box_mock_test_"))
+    else:
+        data_dir = Path("/data")
+        data_dir.mkdir(parents=True, exist_ok=True)
+        app.config["DATA_DIR"] = data_dir
     app.logger.setLevel("DEBUG")
 
     app.register_blueprint(admin_bp)
