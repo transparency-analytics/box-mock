@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import mimetypes
 import shutil
 import uuid
 from typing import TYPE_CHECKING
@@ -41,7 +42,24 @@ def get_file(file_id: str) -> Response | tuple[Response, int]:
         return jsonify(
             {"type": "error", "code": "not_found", "message": "File not found"},
         ), 404
-    return jsonify(file.to_dict())
+    base_url = request.url_root.rstrip("/")
+    content_url = f"{base_url}/2.0/files/{file_id}/content"
+    data = file.to_dict()
+    data["authenticated_download_url"] = content_url
+    ext = (file.name.rsplit(".", 1)[-1].lower()) if "." in file.name else ""
+    if ext == "pdf":
+        rep_entries = [
+            {
+                "representation": "pdf",
+                "status": {"state": "success"},
+                "content": {"url_template": f"{content_url}{{+asset_path}}"},
+                "properties": {},
+            }
+        ]
+    else:
+        rep_entries = []
+    data["representations"] = {"entries": rep_entries}
+    return jsonify(data)
 
 
 @files_bp.route("/files/<file_id>", methods=["PUT"])
@@ -94,7 +112,13 @@ def download_file(file_id: str) -> Response | tuple[Response, int]:
             {"type": "error", "code": "not_found", "message": "File content not found"},
         ), 404
 
-    return send_file(file_path, download_name=file.name)
+    mime_type, _ = mimetypes.guess_type(file.name)
+    return send_file(
+        file_path,
+        download_name=file.name,
+        mimetype=mime_type or "application/octet-stream",
+        as_attachment=True,
+    )
 
 
 def extract_file_content() -> bytes | None:
