@@ -54,8 +54,9 @@ def test_get_folder_not_found(client: FlaskClient):
 
 
 def test_get_folder_has_required_fields_for_picker(client: FlaskClient):
-    """GET /2.0/folders/<id> must return item_collection, path_collection, and permissions
-    so that the Box UI Elements picker does not throw 'Bad box item!'.
+    """GET /2.0/folders/<id> must return item_collection,
+    path_collection, and permissions so that the Box UI Elements
+    picker does not throw 'Bad box item!'.
     """
     response = client.get("/2.0/folders/0")
 

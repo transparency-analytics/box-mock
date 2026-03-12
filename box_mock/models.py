@@ -71,7 +71,10 @@ class Folder(Base):
     )
 
     def get_path_collection(self) -> list[dict[str, Any]]:
-        """Return the ancestor chain from root down to (but not including) this folder."""
+        """
+        Return the ancestor chain from root down to
+        (but not including) this folder.
+        """
         ancestors: list[dict[str, Any]] = []
         node = self.parent
         while node is not None:
@@ -99,7 +102,9 @@ class Folder(Base):
         sort: str = "name",
         direction: str = "asc",
     ) -> dict[str, Any]:
-        """Return a full folder representation including item_collection and path_collection.
+        """
+        Return a full folder representation including item_collection
+        and path_collection.
 
         This is the shape expected by the Box UI Elements picker.
         """

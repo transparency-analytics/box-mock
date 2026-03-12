@@ -20,13 +20,12 @@ if TYPE_CHECKING:
 
 
 def get_files_dir() -> Path:
-    """Get the files directory for the current identity.
+    """
+    Get the files directory for the current identity.
 
     When ``app.config["FILES_DIR"]`` is set (e.g. in tests) it is used as the
     root instead of the default ``DATA_DIR / identity / files`` path.
     """
-    from pathlib import Path  # noqa: PLC0415
-
     from flask import current_app  # noqa: PLC0415
 
     identity = g.get("identity", "default")

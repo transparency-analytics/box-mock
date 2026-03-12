@@ -36,7 +36,10 @@ def create_folder() -> tuple[Response, int]:
 
 @folders_bp.route("/folders/<folder_id>", methods=["GET"])
 def get_folder(folder_id: str) -> Response | tuple[Response, int]:
-    """Get folder by ID, with inline item_collection for Box UI Elements compatibility."""
+    """
+    Get folder by ID, with inline item_collection
+    for Box UI Elements compatibility.
+    """
     folder = db.session.get(Folder, folder_id)
     if not folder:
         return jsonify(
@@ -54,7 +57,9 @@ def get_folder(folder_id: str) -> Response | tuple[Response, int]:
     sort = request.args.get("sort", "name")
     direction = request.args.get("direction", "asc")
 
-    return jsonify(folder.to_full_dict(limit=limit, offset=offset, sort=sort, direction=direction))
+    return jsonify(
+        folder.to_full_dict(limit=limit, offset=offset, sort=sort, direction=direction)
+    )
 
 
 @folders_bp.route("/folders/<folder_id>", methods=["PUT"])
