@@ -16,8 +16,9 @@ from box_mock.routes.sign_requests import sign_requests_bp
 from box_mock.routes.users import users_bp
 
 
-def create_app(testing: bool = False) -> Flask:
-    """Create Flask app with identity-based database isolation.
+def create_app(*, testing: bool = False) -> Flask:
+    """
+    Create Flask app with identity-based database isolation.
 
     Pass ``testing=True`` to use a fresh in-memory SQLite database instead of
     the on-disk store under ``/data``.  Each call with ``testing=True`` gets its

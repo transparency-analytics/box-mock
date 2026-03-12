@@ -42,7 +42,8 @@ def _make_engine_and_session_class(
 
 
 def get_session_class(identity: str, db_url: str | None = None) -> type[Session]:
-    """Get or create a session class for the given identity.
+    """
+    Get or create a session class for the given identity.
 
     When *db_url* is provided (e.g. an in-memory SQLite URL for testing) it is
     used directly.  Otherwise a file-based database under DATA_DIR is used.
