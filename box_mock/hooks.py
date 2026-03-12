@@ -26,7 +26,8 @@ def log_request() -> None:
 def setup_db_session() -> None:
     """Before request hook to setup database session."""
     g.identity = get_identity()
-    session_class = get_session_class(g.identity)
+    db_url: str | None = current_app.config.get("DB_URL")
+    session_class = get_session_class(g.identity, db_url=db_url)
     g.db_session = session_class()
 
 
