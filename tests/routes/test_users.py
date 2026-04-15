@@ -11,6 +11,9 @@ def test_get_current_user(client: FlaskClient):
     data = response.json
     assert data["type"] == "user"
     assert "id" in data
+    assert data["space_amount"] == 1099511627776
+    assert data["space_used"] == 0
+    assert data["max_upload_size"] == 5368709120
 
 
 def test_list_users(client: FlaskClient):

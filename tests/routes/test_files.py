@@ -1,5 +1,6 @@
 """Tests for file routes."""
 
+import hashlib
 import io
 import json
 
@@ -33,6 +34,23 @@ def test_upload_file(client: FlaskClient):
     assert "entries" in data
     assert len(data["entries"]) == 1
     assert data["entries"][0]["name"] == "test.txt"
+
+
+def test_upload_file_returns_rclone_metadata(client: FlaskClient):
+    """Uploaded file metadata includes fields rclone's Box backend reads."""
+    content = b"test content"
+    response = _upload_file(client, content=content)
+
+    assert response.status_code == 201
+    data = response.json["entries"][0]
+    assert data["sequence_id"] == "1"
+    assert data["etag"]
+    assert data["sha1"] == hashlib.sha1(content).hexdigest()
+    assert data["modified_at"]
+    assert data["content_created_at"]
+    assert data["content_modified_at"]
+    assert data["item_status"] == "active"
+    assert data["owned_by"]["login"] == "service@boxmock.local"
 
 
 def test_get_file(client: FlaskClient):
@@ -97,6 +115,7 @@ def test_upload_file_version(client: FlaskClient):
     assert response.status_code == 201
     data = response.json
     assert data["entries"][0]["file_version"]["version_number"] == 2
+    assert data["entries"][0]["sha1"] == hashlib.sha1(b"new content").hexdigest()
 
 
 def test_copy_file(client: FlaskClient):
@@ -122,3 +141,36 @@ def test_preflight_check(client: FlaskClient):
 
     assert response.status_code == 200
     assert "upload_token" in response.json
+
+
+def test_rclone_pre_upload_check(client: FlaskClient):
+    """OPTIONS /2.0/files/content/ returns the simple upload target."""
+    response = client.open(
+        "/2.0/files/content/",
+        method="OPTIONS",
+        json={"name": "unique_file.txt", "parent": {"id": "0"}, "size": 12},
+    )
+
+    assert response.status_code == 200
+    assert response.json["upload_token"] == "dummy"
+    assert response.json["upload_url"].endswith("/2.0/files/content")
+
+
+def test_rclone_pre_upload_check_conflict(client: FlaskClient):
+    """Existing file conflicts use rclone's expected single-object shape."""
+    uploaded = _upload_file(client, name="exists.txt").json["entries"][0]
+
+    response = client.open(
+        "/2.0/files/content/",
+        method="OPTIONS",
+        json={"name": "exists.txt", "parent": {"id": "0"}, "size": 12},
+    )
+
+    assert response.status_code == 409
+    data = response.json
+    assert data["code"] == "item_name_in_use"
+    conflict = data["context_info"]["conflicts"]
+    assert isinstance(conflict, dict)
+    assert conflict["type"] == "file"
+    assert conflict["id"] == uploaded["id"]
+    assert conflict["name"] == "exists.txt"

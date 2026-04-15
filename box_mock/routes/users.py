@@ -19,7 +19,15 @@ def get_current_user() -> Response:
         user = User(name="Box Mock Service", login="service@boxmock.local")
         db.session.add(user)
         db.session.commit()
-    return jsonify(user.to_dict())
+    data = user.to_dict()
+    data.update(
+        {
+            "space_amount": 1099511627776,
+            "space_used": 0,
+            "max_upload_size": 5368709120,
+        },
+    )
+    return jsonify(data)
 
 
 @users_bp.route("/users", methods=["GET"])

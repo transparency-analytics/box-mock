@@ -115,4 +115,25 @@ def get_folder_items(folder_id: str) -> Response | tuple[Response, int]:
     items = [child.to_dict() for child in folder.children]
     items.extend(file.to_dict() for file in folder.files)
 
-    return jsonify({"entries": items, "total_count": len(items)})
+    try:
+        limit = int(request.args.get("limit", 1000))
+    except (ValueError, TypeError):
+        limit = 1000
+    try:
+        offset = int(request.args.get("marker") or request.args.get("offset") or 0)
+    except (ValueError, TypeError):
+        offset = 0
+
+    page = items[offset : offset + limit]
+    next_offset = offset + limit
+    next_marker = str(next_offset) if next_offset < len(items) else None
+
+    return jsonify(
+        {
+            "entries": page,
+            "total_count": len(items),
+            "limit": limit,
+            "offset": offset,
+            "next_marker": next_marker,
+        },
+    )

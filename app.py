@@ -1,6 +1,7 @@
 """Box Mock API Server - Entry point for running the Flask application."""
 
 import argparse
+import os
 import uuid
 from pathlib import Path
 
@@ -38,7 +39,7 @@ def create_app(*, testing: bool = False) -> Flask:
         # File uploads go to a per-test temp directory.
         app.config["FILES_DIR"] = Path(tempfile.mkdtemp(prefix="box_mock_test_"))
     else:
-        data_dir = Path("/data")
+        data_dir = Path(os.environ.get("BOX_MOCK_DATA_DIR", "/data"))
         data_dir.mkdir(parents=True, exist_ok=True)
         app.config["DATA_DIR"] = data_dir
     app.logger.setLevel("DEBUG")
