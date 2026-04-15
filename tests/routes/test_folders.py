@@ -223,3 +223,13 @@ def test_get_folder_items(client: FlaskClient):
     assert data["limit"] == 1000
     assert data["offset"] == 0
     assert data["next_marker"] is None
+
+
+def test_get_folder_items_uses_defaults_for_invalid_paging(client: FlaskClient):
+    """Invalid list paging params fall back to rclone-friendly defaults."""
+    response = client.get("/2.0/folders/0/items?limit=bad&marker=bad")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["limit"] == 1000
+    assert data["offset"] == 0
