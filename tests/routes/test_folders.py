@@ -212,9 +212,24 @@ def test_delete_folder(client: FlaskClient):
 
 def test_get_folder_items(client: FlaskClient):
     """Test that GET /2.0/folders/<id>/items returns folder contents."""
-    response = client.get("/2.0/folders/0/items")
+    response = client.get(
+        "/2.0/folders/0/items?fields=id,name&limit=1000&usemarker=true",
+    )
 
     assert response.status_code == 200
     data = response.json
     assert "entries" in data
     assert "total_count" in data
+    assert data["limit"] == 1000
+    assert data["offset"] == 0
+    assert data["next_marker"] is None
+
+
+def test_get_folder_items_uses_defaults_for_invalid_paging(client: FlaskClient):
+    """Invalid list paging params fall back to rclone-friendly defaults."""
+    response = client.get("/2.0/folders/0/items?limit=bad&marker=bad")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["limit"] == 1000
+    assert data["offset"] == 0

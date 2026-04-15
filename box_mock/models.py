@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
@@ -16,6 +16,25 @@ if TYPE_CHECKING:
 
 class Base(DeclarativeBase):
     """Base class for all models."""
+
+
+def box_time(value: datetime | None) -> str | None:
+    """Return a Box/rclone-friendly RFC3339 timestamp."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def owner_dict() -> dict[str, str]:
+    """Return a minimal fake owner block for Box item responses."""
+    return {
+        "type": "user",
+        "id": "boxmock",
+        "name": "Box Mock Service",
+        "login": "service@boxmock.local",
+    }
 
 
 class User(Base):
@@ -41,7 +60,7 @@ class User(Base):
             "email": self.email,
             "is_platform_access_only": self.is_platform_access_only,
             "job_title": self.job_title,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": box_time(self.created_at),
         }
 
 
@@ -54,6 +73,7 @@ class Folder(Base):
     parent_id = Column(String(36), ForeignKey("folders.id"), nullable=True)
     name = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     parent = relationship(
         "Folder",
@@ -88,11 +108,20 @@ class Folder(Base):
         return {
             "type": "folder",
             "id": self.id,
+            "sequence_id": "0",
+            "etag": self.id,
+            "sha1": "",
             "name": self.name,
+            "size": 0,
             "parent": {"type": "folder", "id": self.parent_id}
             if self.parent_id
             else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": box_time(self.created_at),
+            "modified_at": box_time(self.modified_at or self.created_at),
+            "content_created_at": box_time(self.created_at),
+            "content_modified_at": box_time(self.modified_at or self.created_at),
+            "item_status": "active",
+            "owned_by": owner_dict(),
         }
 
     def to_full_dict(
@@ -131,8 +160,15 @@ class Folder(Base):
             "parent": {"type": "folder", "id": self.parent_id}
             if self.parent_id
             else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "modified_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": box_time(self.created_at),
+            "modified_at": box_time(self.modified_at or self.created_at),
+            "content_created_at": box_time(self.created_at),
+            "content_modified_at": box_time(self.modified_at or self.created_at),
+            "sequence_id": "0",
+            "etag": self.id,
+            "sha1": "",
+            "item_status": "active",
+            "owned_by": owner_dict(),
             "permissions": {
                 "can_download": True,
                 "can_upload": True,
@@ -169,7 +205,9 @@ class File(Base):
     name = Column(String(255), nullable=False)
     version = Column(Integer, default=1)
     size = Column(Integer, default=0)
+    sha1 = Column(String(40), nullable=False, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     folder = relationship("Folder", back_populates="files")
 
@@ -178,10 +216,17 @@ class File(Base):
         return {
             "type": "file",
             "id": self.id,
+            "sequence_id": str(self.version or 0),
+            "etag": f"{self.id}_v{self.version}",
             "name": self.name,
             "size": self.size,
             "extension": self.name.rsplit(".", 1)[-1] if "." in self.name else "",
-            "sha1": "",
+            "sha1": self.sha1,
+            "modified_at": box_time(self.modified_at or self.created_at),
+            "content_created_at": box_time(self.created_at),
+            "content_modified_at": box_time(self.modified_at or self.created_at),
+            "item_status": "active",
+            "owned_by": owner_dict(),
             "is_download_available": True,
             "authenticated_download_url": f"/2.0/files/{self.id}/content",
             "watermark_info": {"is_watermarked": False},
@@ -210,7 +255,7 @@ class File(Base):
                     }
                 ]
             },
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": box_time(self.created_at),
         }
 
 
@@ -240,7 +285,7 @@ class SignRequest(Base):
             "parent_folder": {"type": "folder", "id": self.parent_folder_id}
             if self.parent_folder_id
             else None,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": box_time(self.created_at),
         }
 
 

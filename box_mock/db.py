@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from flask import g
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-DATA_DIR = Path("/data")
+DATA_DIR = Path(os.environ.get("BOX_MOCK_DATA_DIR", "/data"))
 # Cache key is (identity, db_url) so file-based and in-memory engines coexist.
 _engines: dict[tuple[str, str | None], tuple] = {}
 

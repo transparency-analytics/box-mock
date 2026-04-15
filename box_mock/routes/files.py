@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import shutil
@@ -137,10 +138,47 @@ def extract_file_content() -> bytes | None:
     for key in request.files:
         f = request.files[key]
         if f is not None:
-            content = f.read()
-            if content:
-                return content
+            return f.read()
     return None
+
+
+@files_bp.route("/files/content/", methods=["OPTIONS"])
+def pre_upload_check() -> tuple[Response, int]:
+    """Check whether a simple upload would conflict with an existing file."""
+    data = request.get_json(silent=True) or {}
+    name = data.get("name")
+    parent_id = data.get("parent", {}).get("id", "0")
+
+    folder = db.session.get(Folder, parent_id)
+    if not folder:
+        return jsonify(
+            {
+                "type": "error",
+                "status": 404,
+                "code": "not_found",
+                "message": "Parent folder not found",
+            },
+        ), 404
+
+    existing = db.session.query(File).filter_by(folder_id=parent_id, name=name).first()
+    if existing:
+        return jsonify(
+            {
+                "type": "error",
+                "status": 409,
+                "code": "item_name_in_use",
+                "message": "Item with name already exists",
+                "context_info": {"conflicts": existing.to_dict()},
+            },
+        ), 409
+
+    base_url = request.url_root.rstrip("/")
+    return jsonify(
+        {
+            "upload_token": "dummy",
+            "upload_url": f"{base_url}/2.0/files/content",
+        },
+    ), 200
 
 
 @files_bp.route("/files/content", methods=["POST"])
@@ -168,14 +206,19 @@ def upload_file() -> tuple[Response, int]:
             {"type": "error", "code": "bad_request", "message": "No file provided"},
         ), 400
 
-    file = File(name=name, folder_id=parent_id, size=len(content))
+    file = File(
+        name=name,
+        folder_id=parent_id,
+        size=len(content),
+        sha1=hashlib.sha1(content).hexdigest(),
+    )
     db.session.add(file)
     db.session.commit()
 
     file_path = get_file_path(file.id)
     file_path.write_bytes(content)
 
-    return jsonify({"entries": [file.to_dict()]}), 201
+    return jsonify({"entries": [file.to_dict()], "total_count": 1}), 201
 
 
 @files_bp.route("/files/<file_id>/content", methods=["POST"])
@@ -195,12 +238,13 @@ def upload_file_version(file_id: str) -> tuple[Response, int]:
 
     file.version += 1
     file.size = len(content)
+    file.sha1 = hashlib.sha1(content).hexdigest()
     db.session.commit()
 
     file_path = get_file_path(file.id)
     file_path.write_bytes(content)
 
-    return jsonify({"entries": [file.to_dict()]}), 201
+    return jsonify({"entries": [file.to_dict()], "total_count": 1}), 201
 
 
 @files_bp.route("/files/<file_id>/copy", methods=["POST"])
@@ -226,7 +270,12 @@ def copy_file(file_id: str) -> tuple[Response, int]:
             },
         ), 404
 
-    new_file = File(name=new_name, folder_id=parent_id, size=file.size)
+    new_file = File(
+        name=new_name,
+        folder_id=parent_id,
+        size=file.size,
+        sha1=file.sha1,
+    )
     db.session.add(new_file)
     db.session.commit()
 
