@@ -16,7 +16,7 @@ from flask import (
 )
 
 from box_mock.db import DATA_DIR, get_session_class, reset_identity_data
-from box_mock.models import Folder, SignRequest, User
+from box_mock.models import Folder, Group, SignRequest, User
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -77,6 +77,26 @@ BROWSE_TEMPLATE = """
   {% else %}
   <p><em>No users</em></p>
   {% endif %}
+
+  <h3>Groups ({{ ident.groups|length }})</h3>
+  {% if ident.groups %}
+  <ul>
+  {% for group in ident.groups %}
+    <li>
+      👥 <b>{{ group.name }}</b> ({{ group.id }}) - {{ group.member_count }} members
+      {% if group.members %}
+      <ul>
+      {% for member in group.members %}
+        <li>{{ member }}</li>
+      {% endfor %}
+      </ul>
+      {% endif %}
+    </li>
+  {% endfor %}
+  </ul>
+  {% else %}
+  <p><em>No groups</em></p>
+  {% endif %}
   
   <h3>Sign Requests ({{ ident.sign_requests|length }})</h3>
   {% if ident.sign_requests %}
@@ -134,6 +154,21 @@ def _get_identity_data(identity: str) -> dict[str, Any]:
             for u in session.query(User).all()
         ]
 
+        groups = []
+        for group in session.query(Group).all():
+            members = sorted(
+                membership.user.email or membership.user.login or membership.user.name
+                for membership in group.memberships
+            )
+            groups.append(
+                {
+                    "id": group.id,
+                    "name": group.name,
+                    "member_count": len(members),
+                    "members": members,
+                },
+            )
+
         sign_requests = []
         for sr in session.query(SignRequest).all():
             signers = json.loads(sr.signers_json) if sr.signers_json else []
@@ -143,6 +178,7 @@ def _get_identity_data(identity: str) -> dict[str, Any]:
             "name": identity,
             "tree": tree,
             "users": users,
+            "groups": groups,
             "sign_requests": sign_requests,
         }
     finally:

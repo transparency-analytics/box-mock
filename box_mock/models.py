@@ -7,7 +7,16 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 if TYPE_CHECKING:
@@ -49,6 +58,11 @@ class User(Base):
     is_platform_access_only = Column(Boolean, default=False)
     job_title = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    memberships = relationship(
+        "GroupMembership",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert user to dictionary representation."""
@@ -192,6 +206,84 @@ class Folder(Base):
             "is_externally_owned": False,
             "is_download_available": True,
             "size": 0,
+        }
+
+
+class Group(Base):
+    """Box group."""
+
+    __tablename__ = "groups"
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(255), nullable=False, unique=True, index=True)
+    description = Column(String(255), nullable=True)
+    provenance = Column(String(255), nullable=True)
+    external_sync_identifier = Column(String(255), nullable=True)
+    invitability_level = Column(String(32), nullable=True)
+    member_viewability_level = Column(String(32), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    memberships = relationship(
+        "GroupMembership",
+        back_populates="group",
+        cascade="all, delete-orphan",
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert group to dictionary representation."""
+        return {
+            "type": "group",
+            "id": self.id,
+            "name": self.name,
+            "group_type": "managed_group",
+            "description": self.description,
+            "provenance": self.provenance,
+            "external_sync_identifier": self.external_sync_identifier,
+            "invitability_level": self.invitability_level,
+            "member_viewability_level": self.member_viewability_level,
+            "created_at": box_time(self.created_at),
+            "modified_at": box_time(self.modified_at or self.created_at),
+        }
+
+
+class GroupMembership(Base):
+    """Box group membership linking a user and group."""
+
+    __tablename__ = "group_memberships"
+    __table_args__ = (
+        UniqueConstraint("user_id", "group_id", name="uq_group_membership"),
+    )
+
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
+    group_id = Column(String(36), ForeignKey("groups.id"), nullable=False)
+    role = Column(String(32), nullable=False, default="member")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    modified_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="memberships")
+    group = relationship("Group", back_populates="memberships")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert membership to dictionary representation."""
+        return {
+            "type": "group_membership",
+            "id": self.id,
+            "role": self.role,
+            "user": {
+                "type": "user",
+                "id": self.user.id,
+                "name": self.user.name,
+                "login": self.user.login,
+            },
+            "group": {
+                "type": "group",
+                "id": self.group.id,
+                "name": self.group.name,
+            },
+            "created_at": box_time(self.created_at),
+            "modified_at": box_time(self.modified_at or self.created_at),
         }
 
 
