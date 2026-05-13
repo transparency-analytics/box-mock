@@ -271,6 +271,7 @@ class SignRequest(Base):
     signers_json = Column(Text, nullable=True)
     files_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime, nullable=True)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert sign request to dictionary representation."""
@@ -281,11 +282,13 @@ class SignRequest(Base):
             "id": self.id,
             "status": self.status,
             "signers": signers,
-            "sign_files": {"files": files},
+            "sign_files": {"files": files, "is_ready_for_download": True},
             "parent_folder": {"type": "folder", "id": self.parent_folder_id}
             if self.parent_folder_id
             else None,
+            "redirect_url": self.redirect_url,
             "created_at": box_time(self.created_at),
+            "finished_at": box_time(self.finished_at),
         }
 
 
