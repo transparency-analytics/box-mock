@@ -12,7 +12,7 @@ from box_mock.routes.admin import admin_bp
 from box_mock.routes.collaborations import collaborations_bp
 from box_mock.routes.files import files_bp
 from box_mock.routes.folders import folders_bp
-from box_mock.routes.sign_requests import sign_requests_bp
+from box_mock.routes.sign_requests import sign_embed_bp, sign_requests_bp
 from box_mock.routes.users import users_bp
 
 
@@ -41,6 +41,7 @@ def create_app(*, testing: bool = False) -> Flask:
         data_dir = Path("/data")
         data_dir.mkdir(parents=True, exist_ok=True)
         app.config["DATA_DIR"] = data_dir
+        app.config["PUBLIC_BASE_URL"] = "http://localhost:8888"
     app.logger.setLevel("DEBUG")
 
     app.register_blueprint(admin_bp)
@@ -49,6 +50,7 @@ def create_app(*, testing: bool = False) -> Flask:
     app.register_blueprint(files_bp)
     app.register_blueprint(collaborations_bp)
     app.register_blueprint(sign_requests_bp)
+    app.register_blueprint(sign_embed_bp)
 
     app.before_request(setup_db_session)
     app.before_request(log_request)
