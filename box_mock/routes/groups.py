@@ -180,7 +180,7 @@ def create_group_membership() -> tuple[Response, int]:
                 "type": "error",
                 "status": 409,
                 "code": "conflict",
-                "message": "User is already a member of this group",
+                "message": "User already exists in group",
             },
         ), 409
 

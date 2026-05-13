@@ -128,6 +128,7 @@ def test_create_membership_duplicate_returns_409(client: FlaskClient):
     assert first.status_code == 201
     assert second.status_code == 409
     assert second.json["code"] == "conflict"
+    assert "already exists in group" in second.json["message"]
 
 
 def test_create_membership_missing_user_or_group_404(client: FlaskClient):
