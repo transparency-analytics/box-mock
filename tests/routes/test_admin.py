@@ -27,7 +27,7 @@ def test_browse_returns_html(client: FlaskClient):
     response = client.get("/_browse")
 
     assert response.status_code == 200
-    assert b"Box Mock Browser" in response.data
+    assert b"Mock dev" in response.data
 
 
 def test_health_returns_ok(client: FlaskClient):

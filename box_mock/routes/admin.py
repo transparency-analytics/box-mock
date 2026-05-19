@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from flask import (
     Blueprint,
     Response,
+    current_app,
     g,
     jsonify,
     redirect,
@@ -27,7 +28,7 @@ BROWSE_TEMPLATE = """
 <!DOCTYPE html>
 <html>
 <head>
-<title>Box Mock Browser</title>
+<title>Mock {{ version }}</title>
 <style>
   body { font-family: sans-serif; margin: 20px; }
   .identity-section { border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 5px; }
@@ -38,7 +39,7 @@ BROWSE_TEMPLATE = """
 </style>
 </head>
 <body>
-<h1>Box Mock Browser</h1>
+<h1>Mock {{ version }}</h1>
 <p><a href="/_browse">Refresh</a></p>
 
 {% macro render_folder(folder, indent=0) %}
@@ -201,7 +202,12 @@ def browse() -> str:
         else []
     )
 
-    return render_template_string(BROWSE_TEMPLATE, identities=identities)
+    version = current_app.config.get("APP_VERSION", "dev")
+    return render_template_string(
+        BROWSE_TEMPLATE,
+        identities=identities,
+        version=version,
+    )
 
 
 @admin_bp.route("/_reset", methods=["POST"])
