@@ -28,6 +28,7 @@ def create_app(*, testing: bool = False) -> Flask:
     monkeypatching.
     """
     app = Flask(__name__)
+    app.config["APP_VERSION"] = os.environ.get("APP_VERSION", "dev")
 
     if testing:
         import tempfile  # noqa: PLC0415
