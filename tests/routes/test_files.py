@@ -66,6 +66,7 @@ def test_upload_file_returns_rclone_metadata(client: FlaskClient):
     assert response.status_code == 201
     data = response.json["entries"][0]
     assert data["sequence_id"] == "1"
+    assert data["version_number"] == "1"
     assert data["etag"]
     assert data["sha1"] == hashlib.sha1(content).hexdigest()
     assert data["modified_at"]
@@ -136,7 +137,8 @@ def test_upload_file_version(client: FlaskClient):
 
     assert response.status_code == 201
     data = response.json
-    assert data["entries"][0]["file_version"]["version_number"] == 2
+    assert data["entries"][0]["version_number"] == "2"
+    assert data["entries"][0]["file_version"]["type"] == "file_version"
     assert data["entries"][0]["sha1"] == hashlib.sha1(b"new content").hexdigest()
 
 
@@ -165,6 +167,69 @@ def test_upload_file_version_without_content(client: FlaskClient):
 
     assert response.status_code == 400
     assert response.json["code"] == "bad_request"
+
+
+def test_list_file_versions_single(client: FlaskClient):
+    """GET /2.0/files/<id>/versions excludes the current version after upload."""
+    upload_response = _upload_file(client, content=b"hello")
+    file_id = upload_response.json["entries"][0]["id"]
+
+    response = client.get(f"/2.0/files/{file_id}/versions")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["total_count"] == 0
+    assert data["entries"] == []
+
+
+def test_list_file_versions_after_replace(client: FlaskClient):
+    """GET /2.0/files/<id>/versions returns only past versions after replace."""
+    upload_response = _upload_file(client, content=b"version one")
+    file_id = upload_response.json["entries"][0]["id"]
+
+    client.post(
+        f"/2.0/files/{file_id}/content",
+        data={"file": (io.BytesIO(b"version two"), "test.txt")},
+        content_type="multipart/form-data",
+    )
+
+    response = client.get(f"/2.0/files/{file_id}/versions")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["total_count"] == 1
+    assert len(data["entries"]) == 1
+    assert data["entries"][0]["version_number"] == "1"
+    assert data["entries"][0]["sha1"] == hashlib.sha1(b"version one").hexdigest()
+
+
+def test_list_file_versions_excludes_current(client: FlaskClient):
+    """GET /2.0/files/<id>/versions excludes the most recent version."""
+    upload_response = _upload_file(client)
+    file_id = upload_response.json["entries"][0]["id"]
+
+    for i in range(2, 4):
+        client.post(
+            f"/2.0/files/{file_id}/content",
+            data={"file": (io.BytesIO(f"version {i}".encode()), "test.txt")},
+            content_type="multipart/form-data",
+        )
+
+    response = client.get(f"/2.0/files/{file_id}/versions")
+
+    assert response.status_code == 200
+    data = response.json
+    assert data["total_count"] == 2
+    assert len(data["entries"]) == 2
+    assert [entry["version_number"] for entry in data["entries"]] == ["1", "2"]
+
+
+def test_list_file_versions_not_found(client: FlaskClient):
+    """GET /2.0/files/<id>/versions returns 404 for a missing file."""
+    response = client.get("/2.0/files/does-not-exist/versions")
+
+    assert response.status_code == 404
+    assert response.json["code"] == "not_found"
 
 
 def test_copy_file(client: FlaskClient):

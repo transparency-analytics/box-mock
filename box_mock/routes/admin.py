@@ -46,7 +46,7 @@ BROWSE_TEMPLATE = """
 <div style="margin-left: {{ indent * 20 }}px">
   <b>📁 {{ folder.name }}</b> <small>({{ folder.id }})</small>
   {% for file in folder.files %}
-  <div style="margin-left: 20px">📄 {{ file.name }} <small>({{ file.id }}, {{ file.size }} bytes)</small></div>
+  <div style="margin-left: 20px">📄 {{ file.name }} <small>({{ file.id }}, {{ file.current_version.size if file.current_version else 0 }} bytes)</small></div>
   {% endfor %}
   {% for child in folder.children %}
   {{ render_folder(child, indent + 1) }}
