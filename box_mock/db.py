@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 from flask import g
@@ -75,8 +76,8 @@ def reset_identity_data(identity: str) -> None:
 
     files_dir = DATA_DIR / identity / "files"
     if files_dir.exists():
-        for f in files_dir.iterdir():
-            f.unlink()
+        shutil.rmtree(files_dir)
+    files_dir.mkdir(parents=True, exist_ok=True)
 
 
 class DBProxy:

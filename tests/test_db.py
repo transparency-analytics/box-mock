@@ -92,10 +92,15 @@ def test_reset_identity_data_clears_files(temp_data_dir: Path):
     files_dir = temp_data_dir / "files-identity" / "files"
     files_dir.mkdir(parents=True, exist_ok=True)
     (files_dir / "test-file.txt").write_text("content")
+    version_dir = files_dir / "file-id"
+    version_dir.mkdir()
+    (version_dir / "version-id").write_text("version content")
 
     reset_identity_data("files-identity")
 
     assert not (files_dir / "test-file.txt").exists()
+    assert not version_dir.exists()
+    assert files_dir.exists()
 
 
 def test_reset_identity_data_handles_missing_identity(temp_data_dir: Path):
