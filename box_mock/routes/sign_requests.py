@@ -19,7 +19,7 @@ from flask import (
 
 from box_mock.db import db
 from box_mock.models import File, Folder, SignRequest
-from box_mock.routes.files import get_file_path
+from box_mock.routes.files import create_version, get_version_path
 
 sign_requests_bp = Blueprint("sign_requests", __name__, url_prefix="/2.0")
 sign_embed_bp = Blueprint("sign_embed", __name__)
@@ -142,11 +142,11 @@ def create_sign_request() -> tuple[Response, int]:
     sign_file = File(
         name=f"sign_doc_{sign_request_id[:8]}.txt",
         folder_id=parent_folder_id,
-        size=len(UNSIGNED_TEXT),
     )
     db.session.add(sign_file)
+    db.session.flush()
+    create_version(sign_file, UNSIGNED_TEXT)
     db.session.commit()
-    get_file_path(sign_file.id).write_bytes(UNSIGNED_TEXT)
 
     signers = []
     for s in signers_data:
@@ -263,14 +263,12 @@ def submit_embed_form(
     appended = f"\nsigned by {signer.get('email')}".encode()
     for entry in files:
         file = db.session.get(File, entry.get("id"))
-        if file is None:
+        if file is None or file.current_version is None:
             continue
-        file_path = get_file_path(file.id)
-        existing = file_path.read_bytes() if file_path.exists() else b""
+        version_path = get_version_path(file.id, file.current_version.id)
+        existing = version_path.read_bytes() if version_path.exists() else b""
         new_content = existing + appended
-        file_path.write_bytes(new_content)
-        file.version = (file.version or 1) + 1
-        file.size = len(new_content)
+        create_version(file, new_content)
 
     sign_request.signers_json = json.dumps(signers)
 

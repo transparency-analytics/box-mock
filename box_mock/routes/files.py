@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from flask import Blueprint, Response, g, jsonify, request, send_file
 
 from box_mock.db import db
-from box_mock.models import File, Folder
+from box_mock.models import File, FileVersion, Folder
 
 files_bp = Blueprint("files", __name__, url_prefix="/2.0")
 
@@ -41,9 +41,49 @@ def get_files_dir() -> Path:
     return files_dir
 
 
-def get_file_path(file_id: str) -> Path:
-    """Get filesystem path for a file."""
+def get_file_dir(file_id: str) -> Path:
+    """Get filesystem directory for all versions of a file."""
     return get_files_dir() / file_id
+
+
+def get_version_path(file_id: str, version_id: str) -> Path:
+    """Get filesystem path for a specific file version."""
+    return get_file_dir(file_id) / version_id
+
+
+def get_file_path(file_id: str) -> Path:
+    """Get filesystem path for a file's current version content."""
+    file = db.session.get(File, file_id)
+    if file is None or file.current_version is None:
+        return get_file_dir(file_id)
+    return get_version_path(file_id, file.current_version.id)
+
+
+def create_version(
+    file: File,
+    content: bytes,
+    *,
+    name: str | None = None,
+) -> FileVersion:
+    """Create a new version for a file and write its content to disk."""
+    version_number = (
+        file.current_version.version_number if file.current_version else 0
+    ) + 1
+    version_name = name if name is not None else file.name
+    version = FileVersion(
+        file_id=file.id,
+        version_number=version_number,
+        name=version_name,
+        size=len(content),
+        sha1=hashlib.sha1(content).hexdigest(),
+    )
+    db.session.add(version)
+    db.session.flush()
+
+    version_path = get_version_path(file.id, version.id)
+    version_path.parent.mkdir(parents=True, exist_ok=True)
+    version_path.write_bytes(content)
+    return version
 
 
 @files_bp.route("/files/<file_id>", methods=["GET"])
@@ -100,9 +140,9 @@ def delete_file(file_id: str) -> tuple[Response, int] | tuple[str, int]:
             {"type": "error", "code": "not_found", "message": "File not found"},
         ), 404
 
-    file_path = get_file_path(file_id)
-    if file_path.exists():
-        file_path.unlink()
+    file_dir = get_file_dir(file_id)
+    if file_dir.exists():
+        shutil.rmtree(file_dir)
 
     db.session.delete(file)
     db.session.commit()
@@ -118,7 +158,13 @@ def download_file(file_id: str) -> Response | tuple[Response, int]:
             {"type": "error", "code": "not_found", "message": "File not found"},
         ), 404
 
-    file_path = get_file_path(file_id)
+    version = file.current_version
+    if version is None:
+        return jsonify(
+            {"type": "error", "code": "not_found", "message": "File content not found"},
+        ), 404
+
+    file_path = get_version_path(file_id, version.id)
     if not file_path.exists():
         return jsonify(
             {"type": "error", "code": "not_found", "message": "File content not found"},
@@ -130,6 +176,24 @@ def download_file(file_id: str) -> Response | tuple[Response, int]:
         download_name=file.name,
         mimetype=mime_type or "application/octet-stream",
         as_attachment=True,
+    )
+
+
+@files_bp.route("/files/<file_id>/versions", methods=["GET"])
+def list_file_versions(file_id: str) -> Response | tuple[Response, int]:
+    """List past versions for a file (excludes the current version)."""
+    file = db.session.get(File, file_id)
+    if not file:
+        return jsonify(
+            {"type": "error", "code": "not_found", "message": "File not found"},
+        ), 404
+
+    past_versions = file.versions[:-1] if file.versions else []
+    return jsonify(
+        {
+            "entries": [version.to_dict() for version in past_versions],
+            "total_count": len(past_versions),
+        },
     )
 
 
@@ -209,14 +273,11 @@ def upload_file() -> tuple[Response, int]:
     file = File(
         name=name,
         folder_id=parent_id,
-        size=len(content),
-        sha1=hashlib.sha1(content).hexdigest(),
     )
     db.session.add(file)
+    db.session.flush()
+    create_version(file, content, name=name)
     db.session.commit()
-
-    file_path = get_file_path(file.id)
-    file_path.write_bytes(content)
 
     return jsonify({"entries": [file.to_dict()], "total_count": 1}), 201
 
@@ -236,13 +297,8 @@ def upload_file_version(file_id: str) -> tuple[Response, int]:
             {"type": "error", "code": "bad_request", "message": "No file provided"},
         ), 400
 
-    file.version += 1
-    file.size = len(content)
-    file.sha1 = hashlib.sha1(content).hexdigest()
+    create_version(file, content)
     db.session.commit()
-
-    file_path = get_file_path(file.id)
-    file_path.write_bytes(content)
 
     return jsonify({"entries": [file.to_dict()], "total_count": 1}), 201
 
@@ -270,19 +326,20 @@ def copy_file(file_id: str) -> tuple[Response, int]:
             },
         ), 404
 
+    current = file.current_version
     new_file = File(
         name=new_name,
         folder_id=parent_id,
-        size=file.size,
-        sha1=file.sha1,
     )
     db.session.add(new_file)
-    db.session.commit()
+    db.session.flush()
 
-    src_path = get_file_path(file.id)
-    dst_path = get_file_path(new_file.id)
-    if src_path.exists():
-        shutil.copy2(src_path, dst_path)
+    if current is not None:
+        src_path = get_version_path(file.id, current.id)
+        if src_path.exists():
+            create_version(new_file, src_path.read_bytes(), name=new_name)
+
+    db.session.commit()
 
     return jsonify(new_file.to_dict()), 201
 
