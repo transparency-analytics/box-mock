@@ -132,7 +132,14 @@ def _get_tree(session: Session, folder: Folder) -> dict[str, Any]:
     return {
         "id": folder.id,
         "name": folder.name,
-        "files": [{"id": f.id, "name": f.name, "size": f.size} for f in folder.files],
+        "files": [
+            {
+                "id": f.id,
+                "name": f.name,
+                "size": f.current_version.size if f.current_version else 0,
+            }
+            for f in folder.files
+        ],
         "children": [_get_tree(session, child) for child in folder.children],
     }
 
