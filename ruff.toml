@@ -50,6 +50,10 @@ unfixable = []
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
 [lint.per-file-ignores]
+"scripts/**/*.py" = [
+    "T201",     # CLI scripts print their output
+    "INP001",   # Standalone scripts, not a package
+]
 "tests/**/*.py" = [
     "ANN201",   # Return type annotations for test functions
     "PLR2004",  # Magic values (status codes)

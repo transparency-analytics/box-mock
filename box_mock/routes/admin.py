@@ -42,14 +42,14 @@ BROWSE_TEMPLATE = """
 <h1>Mock {{ version }}</h1>
 <p><a href="/_browse">Refresh</a></p>
 
-{% macro render_folder(folder, indent=0) %}
+{% macro render_folder(folder, identity, indent=0) %}
 <div style="margin-left: {{ indent * 20 }}px">
   <b>📁 {{ folder.name }}</b> <small>({{ folder.id }})</small>
   {% for file in folder.files %}
-  <div style="margin-left: 20px">📄 {{ file.name }} <small>({{ file.id }}, {{ file.current_version.size if file.current_version else 0 }} bytes)</small></div>
+  <div style="margin-left: 20px"><a href="/2.0/files/{{ file.id }}/content?access_token=Identity%3D{{ identity | urlencode }}">📄 {{ file.name }}</a> <small>({{ file.id }}, {{ file.size }} bytes)</small></div>
   {% endfor %}
   {% for child in folder.children %}
-  {{ render_folder(child, indent + 1) }}
+  {{ render_folder(child, identity, indent + 1) }}
   {% endfor %}
 </div>
 {% endmacro %}
@@ -66,7 +66,7 @@ BROWSE_TEMPLATE = """
   </div>
   
   <h3>Folders & Files</h3>
-  {{ render_folder(ident.tree) }}
+  {{ render_folder(ident.tree, ident.name) }}
   
   <h3>Users ({{ ident.users|length }})</h3>
   {% if ident.users %}
