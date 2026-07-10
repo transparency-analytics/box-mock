@@ -124,6 +124,33 @@ def test_download_file(client: FlaskClient):
     assert response.data == b"hello world"
 
 
+def test_download_file_with_access_token_query_param(client: FlaskClient):
+    """Identity in the access_token query param works without an auth header.
+
+    This is how download links on /_browse carry the identity, since a
+    browser click sends no Authorization header.
+    """
+    content = b"hello from the browser"
+    upload_response = client.post(
+        "/2.0/files/content",
+        data={
+            "attributes": json.dumps({"name": "hello.txt", "parent": {"id": "0"}}),
+            "file": (io.BytesIO(content), "hello.txt"),
+        },
+        content_type="multipart/form-data",
+        headers={"Authorization": "Identity=browse-ident"},
+    )
+    file_id = upload_response.json["entries"][0]["id"]
+
+    response = client.get(
+        f"/2.0/files/{file_id}/content?access_token=Identity%3Dbrowse-ident",
+    )
+
+    assert response.status_code == 200
+    assert response.data == content
+    assert "attachment" in response.headers["Content-Disposition"]
+
+
 def test_upload_file_version(client: FlaskClient):
     """Test that POST /2.0/files/<id>/content uploads new version."""
     upload_response = _upload_file(client)
